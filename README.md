@@ -2,7 +2,7 @@
 Public installers, documentation, and release assets for VigorLabs Edge Gateway.
 
 ## Current Release
-- Latest published release as of August 4, 2026: `v1.0.1` (pending publication)
+- Latest published release as of August 4, 2026: [`v1.0.1`](https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/tag/v1.0.1)
 - Linux asset:
   `vigor-gateway-v1.0.1-linux-x86_64.tar.gz`
 - Tarball checksum asset:
