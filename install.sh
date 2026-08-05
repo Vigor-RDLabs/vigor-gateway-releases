@@ -163,6 +163,12 @@ if [ -n "$PAIRING_CODE" ]; then
 
   echo "Pairing successful! Gateway ID: $GW_ID"
   
+  if [ -f /etc/vigor/config.json ]; then
+    echo "Warning: Existing configuration found at /etc/vigor/config.json."
+    echo "Backing up existing configuration to /etc/vigor/config.json.bak"
+    cp /etc/vigor/config.json /etc/vigor/config.json.bak
+  fi
+
   sed -e "s|\"gateway_id\": \"[^\"]*\"|\"gateway_id\": \"$GW_ID\"|g" \
       -e "s|\"gateway_token\": \"[^\"]*\"|\"gateway_token\": \"$GW_TOKEN\"|g" \
       -e "s|\"control_url\": \"[^\"]*\"|\"control_url\": \"$CTRL_URL\"|g" \
