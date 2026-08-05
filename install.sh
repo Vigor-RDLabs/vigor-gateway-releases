@@ -16,7 +16,7 @@ require_root() {
 }
 
 # Parse command line options
-VERSION="v1.0.3"
+VERSION=""
 PAIRING_CODE=""
 API_URL="https://api.vigorlabs.org"
 
@@ -39,6 +39,18 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [ -z "$VERSION" ]; then
+  echo "Resolving latest gateway version..."
+  VERSION=$(curl -s "https://api.github.com/repos/Vigor-RDLabs/vigor-gateway-releases/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
+  if [ -z "$VERSION" ]; then
+    VERSION=$(curl -fsSL -o /dev/null -w "%{url_effective}" "https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/latest" | awk -F'/' '{print $NF}' | tr -d '\r\n' || echo "")
+  fi
+  if [ -z "$VERSION" ] || [ "$VERSION" = "latest" ]; then
+    VERSION="v1.0.4"
+  fi
+  echo "Latest version resolved: $VERSION"
+fi
 
 # Check if running standalone without release bundle files
 STANDALONE_MODE=false
