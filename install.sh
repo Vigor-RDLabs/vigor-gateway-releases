@@ -105,6 +105,10 @@ verify_gateway_runtime() {
 echo "=== Installing Vigor Edge Gateway Daemon ==="
 
 require_root
+if systemctl is-active --quiet vigor-gateway.service 2>/dev/null; then
+  echo "Stopping running vigor-gateway service..."
+  systemctl stop vigor-gateway.service || true
+fi
 verify_bundle_files
 install_runtime_dependencies
 
@@ -167,8 +171,14 @@ cp "$SCRIPT_DIR/vigor-gateway.service" /etc/systemd/system/vigor-gateway.service
 systemctl daemon-reload
 systemctl enable vigor-gateway.service
 
+# 7. Start or restart service automatically
+if [ -n "$PAIRING_CODE" ] || systemctl is-enabled --quiet vigor-gateway.service 2>/dev/null; then
+  echo "Starting Vigor Edge Gateway Daemon..."
+  systemctl restart vigor-gateway.service || true
+fi
+
 echo "=== Vigor Edge Gateway Daemon Installed Successfully ==="
 echo "Next steps:"
-echo "1. Edit /etc/vigor/config.json with your Gateway ID, Token, and local RTSP cameras"
-echo "2. Start service: sudo systemctl start vigor-gateway"
+echo "1. Edit /etc/vigor/config.json with your Gateway ID, Token, and local RTSP cameras (if not paired)"
+echo "2. Check service status: sudo systemctl status vigor-gateway"
 echo "3. Check logs: sudo journalctl -u vigor-gateway -f"
