@@ -15,6 +15,60 @@ require_root() {
   fi
 }
 
+# Parse command line options
+VERSION="v1.0.3"
+PAIRING_CODE=""
+API_URL="https://api.vigorlabs.org"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --pair)
+      PAIRING_CODE="$2"
+      shift 2
+      ;;
+    --version)
+      VERSION="$2"
+      shift 2
+      ;;
+    --api-url)
+      API_URL="$2"
+      shift 2
+      ;;
+    *)
+      fail "Unknown option: $1"
+      ;;
+  esac
+done
+
+# Check if running standalone without release bundle files
+STANDALONE_MODE=false
+if [ ! -f "$SCRIPT_DIR/bin/gateway" ] || [ ! -f "$SCRIPT_DIR/config.json.template" ] || [ ! -f "$SCRIPT_DIR/vigor-gateway.service" ]; then
+  STANDALONE_MODE=true
+  echo "Standalone mode detected. Downloading Vigor Edge Gateway bundle ($VERSION)..."
+fi
+
+if [ "$STANDALONE_MODE" = "true" ]; then
+  require_root
+  
+  TMP_DIR=$(mktemp -d)
+  trap 'rm -rf "$TMP_DIR"' EXIT
+
+  TARBALL="vigor-gateway-${VERSION}-linux-x86_64.tar.gz"
+  CHECKSUM="${TARBALL}.sha256"
+
+  echo "Downloading tarball..."
+  curl -fsSL -o "$TMP_DIR/$TARBALL" "https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/download/${VERSION}/${TARBALL}"
+  curl -fsSL -o "$TMP_DIR/$CHECKSUM" "https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/download/${VERSION}/${CHECKSUM}"
+
+  echo "Verifying checksum..."
+  (cd "$TMP_DIR" && sha256sum -c "$CHECKSUM")
+
+  echo "Extracting release bundle..."
+  tar -xzf "$TMP_DIR/$TARBALL" -C "$TMP_DIR"
+
+  SCRIPT_DIR="$TMP_DIR/vigor-gateway-${VERSION}-linux-x86_64"
+fi
+
 verify_bundle_files() {
   local required_files=(
     "$SCRIPT_DIR/bin/gateway"
@@ -71,8 +125,34 @@ chmod 755 /opt/vigor/bin/gateway
 chown -R vigor:vigor /opt/vigor
 verify_gateway_runtime
 
-# 4. Install config template if config does not exist
-if [ ! -f /etc/vigor/config.json ]; then
+# 4. Install config template or pair gateway
+if [ -n "$PAIRING_CODE" ]; then
+  echo "Redeeming pairing code '$PAIRING_CODE' with backend at $API_URL..."
+  PAYLOAD=$(printf '{"pairing_code":"%s","name":"%s"}' "$PAIRING_CODE" "$(hostname)")
+  
+  if ! RESPONSE=$(curl -fsSL -X POST \
+    -H "Content-Type: application/json" \
+    -d "$PAYLOAD" \
+    "${API_URL}/v1/gateways/pair" 2>/dev/null); then
+    fail "Failed to redeem pairing code. Make sure the pairing code is correct and not expired."
+  fi
+
+  GW_ID=$(echo "$RESPONSE" | grep -o '"gateway_id":"[^"]*' | grep -o '[^"]*$')
+  GW_TOKEN=$(echo "$RESPONSE" | grep -o '"gateway_token":"[^"]*' | grep -o '[^"]*$')
+  CTRL_URL=$(echo "$RESPONSE" | grep -o '"control_url":"[^"]*' | grep -o '[^"]*$')
+
+  if [ -z "$GW_ID" ] || [ -z "$GW_TOKEN" ] || [ -z "$CTRL_URL" ]; then
+    fail "Invalid pairing response from backend."
+  fi
+
+  echo "Pairing successful! Gateway ID: $GW_ID"
+  
+  sed -e "s|\"gateway_id\": \"[^\"]*\"|\"gateway_id\": \"$GW_ID\"|g" \
+      -e "s|\"gateway_token\": \"[^\"]*\"|\"gateway_token\": \"$GW_TOKEN\"|g" \
+      -e "s|\"control_url\": \"[^\"]*\"|\"control_url\": \"$CTRL_URL\"|g" \
+      "$SCRIPT_DIR/config.json.template" > /etc/vigor/config.json
+  echo "Installed paired config to /etc/vigor/config.json"
+elif [ ! -f /etc/vigor/config.json ]; then
   cp "$SCRIPT_DIR/config.json.template" /etc/vigor/config.json
   echo "Installed default config to /etc/vigor/config.json"
 fi
