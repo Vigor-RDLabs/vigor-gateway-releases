@@ -1,0 +1,13 @@
+{
+  "name": "vigor-nodejs-sample",
+  "version": "1.0.0",
+  "description": "Vigor WebRTC Streaming signaling sample for Node.js",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,8 @@
+# gateway/.gitignore
+build/
+__pycache__/
+venv/
+*.o
+*.a
+.env
+log/
