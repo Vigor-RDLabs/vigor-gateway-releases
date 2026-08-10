@@ -47,7 +47,7 @@ if [ -z "$VERSION" ]; then
     VERSION=$(curl -fsSL -o /dev/null -w "%{url_effective}" "https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/latest" | awk -F'/' '{print $NF}' | tr -d '\r\n' || echo "")
   fi
   if [ -z "$VERSION" ] || [ "$VERSION" = "latest" ]; then
-    VERSION="v1.0.8"
+    VERSION="v1.0.9"
   fi
   echo "Latest version resolved: $VERSION"
 fi
