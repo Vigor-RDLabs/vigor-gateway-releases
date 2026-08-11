@@ -1,55 +1,56 @@
 # Vigor Live WebRTC Streaming Samples
 
-This directory contains developer integration samples demonstrating how to establish real-time WebRTC streams from cameras managed by the Vigor Connectivity platform.
+This directory contains developer integration samples demonstrating how to establish real-time WebRTC streams from cameras managed by the Vigor Connectivity platform using a secure Backend + Frontend architecture.
 
 ## Sample Structure
 
-The integration samples are structured by programming language:
+The integration samples are structured as follows:
 
-- **[`js-browser/`](./js-browser)**: Web application (HTML/JS) integration displaying a live player in standard browsers. Runs entirely on the client-side.
-- **[`python/`](./python)**: Programmatic backend integration using `aiortc` (Python WebRTC implementation) and asynchronous WebSockets/HTTP calls.
-- **[`nodejs/`](./nodejs)**: Server-side integration demonstrating API calls and handling the SDP exchange via WebSockets signaling.
+- **[`js-browser/`](./js-browser)**: Web player interface (HTML/JS) displaying the live camera video stream in standard browsers. Connects to the backend server to fetch the Viewer Token, and performs WebRTC negotiation directly.
+- **[`nodejs/`](./nodejs)**: Lightweight server-side Node.js backend server. Securely handles credentials to request Viewer JWT Tokens and serves the web player UI.
+- **[`python/`](./python)**: Lightweight server-side Python backend server. Securely handles credentials to request Viewer JWT Tokens and serves the web player UI.
 
 ---
 
-## Core Streaming Flow
+## Secure Production Streaming Flow
 
-Every client (regardless of language) implements the following 4-step workflow to request and establish a live stream:
+To protect your Vigor Project's Client Secret, your application should separate token generation (Backend) from video streaming (Frontend/Browser):
 
 ```mermaid
 sequenceDiagram
-    participant Client as Viewer Client
+    participant Browser as Client Browser (HTML/JS)
+    participant Backend as Backend Server (Node.js/Python)
     participant Cloud as Vigor Cloud API
-    participant WS as Signaling Gateway (WS)
     
     rect rgb(30, 41, 59)
-        note right of Client: Step 1: Authentication
-        Client->>Cloud: POST /v1/auth/viewer-token (Client ID & Secret)
-        Cloud-->>Client: Returns JWT access_token
+        note right of Browser: Step 1: Secure Token Retrieval
+        Browser->>Backend: GET /api/viewer-token
+        Backend->>Cloud: POST /v1/auth/viewer-token (Client ID & Secret)
+        Cloud-->>Backend: Returns 15-minute Viewer JWT Token
+        Backend-->>Browser: Returns token
     end
     
     rect rgb(15, 23, 42)
-        note right of Client: Step 2: Listing available cameras
-        Client->>Cloud: GET /v1/cameras (with JWT Token)
-        Cloud-->>Client: Returns array of enabled Cameras
+        note right of Browser: Step 2: Querying Cameras
+        Browser->>Cloud: GET /v1/cameras (with Viewer Token)
+        Cloud-->>Browser: Returns array of enabled Cameras
     end
     
     rect rgb(30, 41, 59)
-        note right of Client: Step 3: Initializing Session
-        Client->>Cloud: POST /v1/cameras/{camera_id}/sessions (with JWT Token)
-        Cloud-->>Client: Returns session_id, token & ICE servers
+        note right of Browser: Step 3: Initializing Session
+        Browser->>Cloud: POST /v1/cameras/{camera_id}/sessions (with Viewer Token)
+        Cloud-->>Browser: Returns session_id, token & ICE servers
     end
     
     rect rgb(15, 23, 42)
-        note right of Client: Step 4: WebRTC & Signaling Exchange
-        Client->>Client: Initialize local RTCPeerConnection
-        Client->>WS: Connect to WebSocket signaling URL
-        Client->>WS: Send payload: { type: "request", id: camera_id }
-        WS-->>Client: Receives offer: { type: "offer", sdp: "..." }
-        Client->>Client: setRemoteDescription(offer) & createAnswer()
-        Client->>WS: Send payload: { type: "answer", sdp: local_sdp }
-        Note over Client,WS: ICE Candidate & Media negotiation completes
-        Note over Client,WS: WebRTC Media stream established!
+        note right of Browser: Step 4: direct WebRTC & Signaling Exchange
+        Browser->>Browser: Initialize RTCPeerConnection
+        Browser->>Cloud: Connect WebSocket signaling
+        Browser->>Cloud: Send "request" frame
+        Cloud-->>Browser: Receives SDP Offer from Edge Gateway
+        Browser->>Browser: setRemoteDescription & createAnswer
+        Browser->>Cloud: Send SDP Answer
+        Note over Browser,Cloud: WebRTC Media stream established!
     end
 ```
 

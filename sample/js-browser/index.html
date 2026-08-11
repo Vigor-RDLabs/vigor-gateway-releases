@@ -174,11 +174,12 @@
 
         <div class="grid">
             <div class="card">
-                <label for="clientId">App Client ID</label>
-                <input id="clientId" placeholder="client_..." value="">
+                <label for="backendUrl">Backend API URL (Node.js/Python Server)</label>
+                <input id="backendUrl" value="http://localhost:3000">
 
-                <label for="clientSecret">App Client Secret</label>
-                <input id="clientSecret" type="password" placeholder="sec_..." value="">
+                <button id="btnLoad" onclick="loadCameras()" style="background: var(--card); border: 1px solid var(--accent); color: var(--accent); margin-bottom: 1rem;">
+                    🔄 Load Permitted Cameras
+                </button>
 
                 <label for="cameraSelect">Select Camera</label>
                 <select id="cameraSelect">
@@ -187,7 +188,7 @@
             </div>
             <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
-                    <label for="baseUrl">Signaling API Base URL</label>
+                    <label for="baseUrl">Vigor API Base URL</label>
                     <input id="baseUrl" value="https://api.vigorlabs.org">
                 </div>
                 <div>
@@ -201,12 +202,14 @@
             <video id="remoteVideo" autoplay playsinline muted controls></video>
         </div>
 
-        <div id="logs">&gt; Enter credentials and click [Connect & Play Stream] to start...</div>
+        <div id="logs">&gt; Click [Load Permitted Cameras] to fetch backend Viewer Token, select a camera, then click [Connect & Play Stream] to start...</div>
     </div>
 
     <script>
         let peerConnection = null;
         let websocketSignaling = null;
+
+        let viewerToken = null;
 
         function log(msg) {
             const el = document.getElementById('logs');
@@ -232,46 +235,49 @@
             }
         }
 
-        async function startStreamFlow() {
+        async function loadCameras() {
             cleanupConnections();
+            viewerToken = null;
 
+            const backendUrl = document.getElementById('backendUrl').value.trim();
             const baseUrl = document.getElementById('baseUrl').value.trim();
-            const clientId = document.getElementById('clientId').value.trim();
-            const clientSecret = document.getElementById('clientSecret').value.trim();
 
-            if (!clientId || !clientSecret) {
-                log('❌ Error: Client ID and Client Secret are required!');
+            if (!backendUrl) {
+                log('❌ Error: Backend API URL is required!');
                 return;
             }
 
             try {
                 setStatus('AUTHENTICATING...', false);
-                log('1. Authenticating with Vigor API to request Viewer Token...');
+                log(`1. Fetching Viewer JWT Token from backend: ${backendUrl}/api/viewer-token...`);
 
-                // Step 1: Authenticate and get JWT Token
-                const authRes = await fetch(`${baseUrl}/v1/auth/viewer-token`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret })
-                });
-                if (!authRes.ok) throw new Error(`Authentication failed (${authRes.status}): ${authRes.statusText}`);
-                const authData = await authRes.json();
-                const token = authData.access_token;
-                log('✓ Received Viewer JWT Token.');
+                const tokenRes = await fetch(`${backendUrl}/api/viewer-token`);
+                if (!tokenRes.ok) {
+                    const err = await tokenRes.json().catch(() => ({}));
+                    throw new Error(err.error || `Failed to fetch token (${tokenRes.status})`);
+                }
+                const tokenData = await tokenRes.json();
+                viewerToken = tokenData.token;
+                log('✓ Received Viewer JWT Token from backend.');
 
-                // Step 2: Retrieve cameras permitted for this app
-                log('2. Fetching available cameras list...');
+                log('2. Fetching available cameras list from Vigor Cloud...');
                 const camRes = await fetch(`${baseUrl}/v1/cameras`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${viewerToken}` }
                 });
                 if (!camRes.ok) throw new Error(`Failed to fetch cameras: ${camRes.statusText}`);
                 const cameras = await camRes.json();
-                if (!cameras || cameras.length === 0) throw new Error('No permitted cameras found under this credential.');
 
-                // Populating dropdown select list
                 const selectEl = document.getElementById('cameraSelect');
-                const selectedVal = selectEl.value;
                 selectEl.innerHTML = '';
+                if (!cameras || cameras.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.innerText = '-- No cameras available --';
+                    selectEl.appendChild(opt);
+                    log('⚠️ No permitted cameras found under this project credentials.');
+                    return;
+                }
+
                 cameras.forEach(cam => {
                     const opt = document.createElement('option');
                     opt.value = cam.id;
@@ -279,25 +285,44 @@
                     selectEl.appendChild(opt);
                 });
 
-                if (selectedVal && cameras.some(c => c.id === selectedVal)) {
-                    selectEl.value = selectedVal;
-                } else {
-                    // Try to default to the first online camera, otherwise the first camera in list
-                    const firstOnline = cameras.find(c => c.status === 'online');
-                    selectEl.value = firstOnline ? firstOnline.id : cameras[0].id;
-                }
+                // Auto-select first online camera, else first camera in list
+                const firstOnline = cameras.find(c => c.status === 'online');
+                selectEl.value = firstOnline ? firstOnline.id : cameras[0].id;
 
-                const targetCamId = selectEl.value;
-                const targetCam = cameras.find(c => c.id === targetCamId);
-                log(`✓ Target camera selected: ${targetCam.name || targetCam.id} (ID: ${targetCam.id})`);
+                log(`✓ Loaded ${cameras.length} camera(s). Selected: ${selectEl.value}`);
+                setStatus('IDLE', false);
+            } catch (err) {
+                log(`❌ Error: ${err.message}`);
+                setStatus('CONNECTION ERROR', false);
+            }
+        }
 
+        async function startStreamFlow() {
+            cleanupConnections();
+
+            const baseUrl = document.getElementById('baseUrl').value.trim();
+            const selectEl = document.getElementById('cameraSelect');
+            const targetCamId = selectEl.value;
+
+            if (!targetCamId) {
+                log('❌ Error: Please load and select a camera first!');
+                return;
+            }
+
+            if (!viewerToken) {
+                log('❌ Error: Viewer Token is missing. Fetching new token...');
+                await loadCameras();
+                if (!viewerToken) return;
+            }
+
+            try {
                 // Step 3: Initialize live streaming session
-                log('3. Requesting live WebRTC streaming session...');
+                log(`3. Requesting live WebRTC streaming session for camera: ${targetCamId}...`);
                 setStatus('INITIALIZING SESSION...', false);
-                const sessRes = await fetch(`${baseUrl}/v1/cameras/${targetCam.id}/sessions`, {
+                const sessRes = await fetch(`${baseUrl}/v1/cameras/${targetCamId}/sessions`, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${token}`,
+                        'Authorization': `Bearer ${viewerToken}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({})
@@ -311,8 +336,8 @@
                 log(`✓ Created Session ID: ${sessionData.session_id}`);
 
                 // Step 4: WebRTC Peer Connection and Signaling Exchange
-                log('4. Building RTCPeerConnection and connecting to WebSockets signaling channel...');
-                setStatus('NEGOTIATING WEBRTC...', false);
+                log('4. Connecting to stream gateway...');
+                setStatus('NEGOTIATING...', false);
 
                 peerConnection = new RTCPeerConnection({
                     bundlePolicy: "max-bundle",
@@ -321,15 +346,14 @@
 
                 // Attach track reception callback
                 peerConnection.ontrack = (evt) => {
-                    log('🎉 Success! WebRTC media track received from Vigor Gateway!');
+                    log('🎉 Stream connected!');
                     const videoEl = document.getElementById('remoteVideo');
                     videoEl.srcObject = evt.streams[0];
                     videoEl.play().catch(err => console.warn("Video playback autostart failed:", err));
-                    setStatus('LIVE STREAMING (WEBRTC)', true);
+                    setStatus('LIVE STREAMING', true);
                 };
 
                 peerConnection.oniceconnectionstatechange = () => {
-                    log(`🧊 ICE Connection state: ${peerConnection.iceConnectionState}`);
                     if (peerConnection.iceConnectionState === 'disconnected' || peerConnection.iceConnectionState === 'failed') {
                         setStatus('STREAM DISCONNECTED', false);
                     }
@@ -338,7 +362,7 @@
                 peerConnection.onicecandidate = (evt) => {
                     if (evt.candidate && websocketSignaling && websocketSignaling.readyState === WebSocket.OPEN) {
                         websocketSignaling.send(JSON.stringify({
-                            id: targetCam.id,
+                            id: targetCamId,
                             type: 'candidate',
                             candidate: evt.candidate
                         }));
@@ -354,9 +378,9 @@
                 websocketSignaling = new WebSocket(wsUrl);
 
                 websocketSignaling.onopen = () => {
-                    log('✓ WebSocket Signaling Channel connected. Sending initial "request" frame to target Camera...');
+                    log('✓ Requesting video stream...');
                     websocketSignaling.send(JSON.stringify({
-                        id: targetCam.id,
+                        id: targetCamId,
                         type: 'request'
                     }));
                 };
@@ -365,16 +389,13 @@
                     if (typeof evt.data !== 'string') return;
                     try {
                         const msg = JSON.parse(evt.data);
-                        log(`📥 Received signaling payload: ${msg.type}`);
 
                         if (msg.type === 'offer') {
-                            log('✓ Received SDP Offer from Edge Gateway. Applying remote description and creating SDP Answer...');
                             await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: msg.sdp }));
                             
                             const answer = await peerConnection.createAnswer();
                             await peerConnection.setLocalDescription(answer);
 
-                            log('⏳ Waiting for local ICE gathering to complete...');
                             await new Promise(resolve => {
                                 if (peerConnection.iceGatheringState === 'complete') resolve();
                                 else {
@@ -389,24 +410,23 @@
                                 }
                             });
 
-                            log('✓ ICE gathering complete. Dispatching SDP Answer to Edge Gateway...');
                             websocketSignaling.send(JSON.stringify({
-                                id: targetCam.id,
+                                id: targetCamId,
                                 type: peerConnection.localDescription.type,
                                 sdp: peerConnection.localDescription.sdp
                             }));
                         }
                     } catch (e) {
-                        log(`❌ Error processing signaling message: ${e.message}`);
+                        log('❌ Connection error.');
                     }
                 };
 
                 websocketSignaling.onclose = () => {
-                    log('ℹ WebSocket signaling channel closed.');
+                    log('ℹ Connection closed.');
                 };
 
                 websocketSignaling.onerror = (err) => {
-                    log(`❌ WebSocket signaling channel error.`);
+                    log('❌ Connection error.');
                 };
 
             } catch (err) {
@@ -415,6 +435,14 @@
                 cleanupConnections();
             }
         }
+
+        // Initialize backend default URL
+        window.addEventListener('DOMContentLoaded', () => {
+            const defaultBackend = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
+                ? window.location.origin
+                : 'http://localhost:3000';
+            document.getElementById('backendUrl').value = defaultBackend;
+        });
     </script>
 </body>
 

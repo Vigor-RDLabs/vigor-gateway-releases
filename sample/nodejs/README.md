@@ -1,33 +1,28 @@
-# Node.js Signaling Client Sample
+# Node.js Backend Server Sample
 
-This directory contains a server-side Node.js sample demonstrating how to authenticate with the Vigor API, list cameras, request a session, and connect to the WebSocket signaling channel to initiate WebRTC negotiation.
+This directory contains a server-side Node.js backend integration demonstrating how to securely handle your project's credentials (`VIGOR_CLIENT_ID` and `VIGOR_CLIENT_SECRET`) to request 15-minute Viewer JWT Tokens, and serve the browser-based live player UI.
 
 ## Getting Started
 
 1. Ensure you have Node.js 18+ installed on your system.
-2. Install the required WebSocket package:
-   ```bash
-   npm install
-   ```
+2. The server uses native Node.js HTTP APIs, so no external dependencies (`npm install`) are required!
 
 ## Running the Sample
 
-Set your credentials as environment variables and run the script:
+Set your credentials as environment variables and start the server:
 
 ```bash
 export VIGOR_CLIENT_ID="your-app-client-id"
 export VIGOR_CLIENT_SECRET="your-app-client-secret"
 
-# (Optional) specify custom API URL or a specific Camera ID
-# export VIGOR_API_URL="https://api.vigorlabs.org"
-# export VIGOR_CAMERA_ID="cam_..."
-
 npm start
 ```
 
+Once running:
+- **Web App UI**: Open `http://localhost:3000` in your web browser.
+- **Secure Token API**: Frontend can fetch the token via `GET http://localhost:3000/api/viewer-token`.
+
 ## How It Works
 
-1. The script uses the standard `fetch` API to authenticate at `/v1/auth/viewer-token` and retrieve a Viewer JWT token.
-2. It fetches permitted cameras list via `/v1/cameras` and prints the details of the selected camera.
-3. It requests a new WebRTC session at `/v1/cameras/{camera_id}/sessions` and prints the returned ICE servers.
-4. It connects to the Vigor WebSocket signaling service using the `ws` package and exchanges the initial `"request"` control frame to trigger the camera's SDP Offer.
+1. **Secure Token Exchange**: Instead of exposing Client Secret to the frontend browser, the Node.js backend handles authentication at `/v1/auth/viewer-token` and returns a scoped 15-minute `token` to the client.
+2. **Direct Browser Streaming**: The browser client (`js-browser/index.html`) retrieves the token and performs the WebRTC connection, ICE candidate exchange, and video stream decoding natively.

@@ -2,6 +2,7 @@
 build/
 __pycache__/
 venv/
+node_modules
 *.o
 *.a
 .env
