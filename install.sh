@@ -134,11 +134,15 @@ fi
 mkdir -p /opt/vigor/bin
 mkdir -p /etc/vigor
 mkdir -p /var/log/vigor
+mkdir -p /usr/share/vigor-gateway
 
-# 3. Install binary
+# 3. Install binary and web assets
 cp "$SCRIPT_DIR/bin/gateway" /opt/vigor/bin/gateway
 chmod 755 /opt/vigor/bin/gateway
+rm -rf /usr/share/vigor-gateway/web
+cp -r "$SCRIPT_DIR/web" /usr/share/vigor-gateway/web
 chown -R vigor:vigor /opt/vigor
+chown -R vigor:vigor /usr/share/vigor-gateway
 verify_gateway_runtime
 
 # 4. Install config template or pair gateway
