@@ -202,6 +202,9 @@ fi
 if ! grep -q '^AmbientCapabilities=CAP_NET_BIND_SERVICE$' /etc/systemd/system/vigor-gateway.service; then
   sed -i '/^StandardError=journal$/a AmbientCapabilities=CAP_NET_BIND_SERVICE\nCapabilityBoundingSet=CAP_NET_BIND_SERVICE' /etc/systemd/system/vigor-gateway.service
 fi
+if ! grep -q '^ReadWritePaths=/etc/vigor$' /etc/systemd/system/vigor-gateway.service; then
+  sed -i '/^ProtectHome=true$/a ReadWritePaths=/etc/vigor' /etc/systemd/system/vigor-gateway.service
+fi
 systemctl daemon-reload
 systemctl enable vigor-gateway.service
 
