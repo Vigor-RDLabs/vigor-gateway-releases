@@ -115,6 +115,17 @@ verify_gateway_runtime() {
   fi
 }
 
+get_gateway_ip() {
+  local ip
+  ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  if [ -z "$ip" ] && command -v ip >/dev/null 2>&1; then
+    ip="$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}' || true)"
+  fi
+  if [ -n "$ip" ]; then
+    printf '%s' "$ip"
+  fi
+}
+
 echo "=== Installing Vigor Edge Gateway Daemon ==="
 
 require_root
@@ -216,7 +227,14 @@ if [ -n "$PAIRING_CODE" ] || systemctl is-enabled --quiet vigor-gateway.service 
 fi
 
 echo "=== Vigor Edge Gateway Daemon Installed Successfully ==="
+GATEWAY_IP="$(get_gateway_ip)"
 echo "Next steps:"
-echo "1. Edit /etc/vigor/config.json with your Gateway ID, Token, and local RTSP cameras (if not paired)"
-echo "2. Check service status: sudo systemctl status vigor-gateway"
-echo "3. Check logs: sudo journalctl -u vigor-gateway -f"
+if [ -n "$GATEWAY_IP" ]; then
+  echo "1. Open local gateway configuration: http://$GATEWAY_IP"
+else
+  echo "1. Open local gateway configuration from this machine's LAN IP: http://<GATEWAY_IP>"
+fi
+echo "2. Add and manage cameras in the local web console. Camera entries are stored in /etc/vigor/cameras.json."
+echo "3. Keep /etc/vigor/config.json for gateway/cloud settings; camera entries there are only used as a fallback when /etc/vigor/cameras.json is empty."
+echo "4. Check service status: sudo systemctl status vigor-gateway"
+echo "5. Check logs: sudo journalctl -u vigor-gateway -f"
