@@ -47,7 +47,7 @@ if [ -z "$VERSION" ]; then
     VERSION=$(curl -fsSL -o /dev/null -w "%{url_effective}" "https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/latest" | awk -F'/' '{print $NF}' | tr -d '\r\n' || echo "")
   fi
   if [ -z "$VERSION" ] || [ "$VERSION" = "latest" ]; then
-    VERSION="v1.0.9"
+    VERSION="v1.0.10"
   fi
   echo "Latest version resolved: $VERSION"
 fi
@@ -86,6 +86,7 @@ verify_bundle_files() {
     "$SCRIPT_DIR/bin/gateway"
     "$SCRIPT_DIR/config.json.template"
     "$SCRIPT_DIR/vigor-gateway.service"
+    "$SCRIPT_DIR/web/static/index.html"
   )
   local path
   for path in "${required_files[@]}"; do
@@ -135,6 +136,8 @@ mkdir -p /opt/vigor/bin
 mkdir -p /etc/vigor
 mkdir -p /var/log/vigor
 mkdir -p /usr/share/vigor-gateway
+chown root:vigor /etc/vigor
+chmod 0770 /etc/vigor
 
 # 3. Install binary and web assets
 cp "$SCRIPT_DIR/bin/gateway" /opt/vigor/bin/gateway
@@ -188,15 +191,25 @@ chown root:vigor /etc/vigor/config.json
 chmod 0640 /etc/vigor/config.json
 echo "Protected /etc/vigor/config.json with mode 0640 (root:vigor)"
 
+rm -f /etc/vigor/local_auth.json /etc/vigor/bootstrap_password
+echo "Reset local web console password state. The next web visit will require administrator password initialization."
+
 # 6. Install systemd service
 cp "$SCRIPT_DIR/vigor-gateway.service" /etc/systemd/system/vigor-gateway.service
+if ! grep -q -- '--web-root /usr/share/vigor-gateway/web/static' /etc/systemd/system/vigor-gateway.service; then
+  sed -i 's|^ExecStart=/opt/vigor/bin/gateway --config /etc/vigor/config.json$|ExecStart=/opt/vigor/bin/gateway --config /etc/vigor/config.json --web-root /usr/share/vigor-gateway/web/static|' /etc/systemd/system/vigor-gateway.service
+fi
+if ! grep -q '^AmbientCapabilities=CAP_NET_BIND_SERVICE$' /etc/systemd/system/vigor-gateway.service; then
+  sed -i '/^StandardError=journal$/a AmbientCapabilities=CAP_NET_BIND_SERVICE\nCapabilityBoundingSet=CAP_NET_BIND_SERVICE' /etc/systemd/system/vigor-gateway.service
+fi
 systemctl daemon-reload
 systemctl enable vigor-gateway.service
 
 # 7. Start or restart service automatically
 if [ -n "$PAIRING_CODE" ] || systemctl is-enabled --quiet vigor-gateway.service 2>/dev/null; then
   echo "Starting Vigor Edge Gateway Daemon..."
-  systemctl restart vigor-gateway.service || true
+  systemctl restart vigor-gateway.service
+  systemctl is-active --quiet vigor-gateway.service
 fi
 
 echo "=== Vigor Edge Gateway Daemon Installed Successfully ==="
