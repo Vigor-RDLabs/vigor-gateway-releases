@@ -2,11 +2,7 @@
 Public installers, documentation, and release assets for VigorLabs Edge Gateway.
 
 ## Current Release
-- Latest published release as of August 11, 2026: [`v1.0.10`](https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/tag/v1.0.10)
-- Linux asset:
-  `vigor-gateway-v1.0.10-linux-x86_64.tar.gz`
-- Tarball checksum asset:
-  `vigor-gateway-v1.0.10-linux-x86_64.tar.gz.sha256`
+You can find and download all release bundles directly from the [GitHub Releases](https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases) page. Each release contains the compiled production binary, installer scripts, local web console, and verified SHA256 checksums.
 
 ## Release Bundle Layout
 Each Linux bundle is expected to contain:
@@ -36,11 +32,14 @@ Use:
 On the target Linux machine:
 
 ```bash
-curl -LO https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/download/v1.0.10/vigor-gateway-v1.0.10-linux-x86_64.tar.gz
-curl -LO https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/download/v1.0.10/vigor-gateway-v1.0.10-linux-x86_64.tar.gz.sha256
-sha256sum -c vigor-gateway-v1.0.10-linux-x86_64.tar.gz.sha256
-tar -xzf vigor-gateway-v1.0.10-linux-x86_64.tar.gz
-cd vigor-gateway-v1.0.10-linux-x86_64
+# Set your target version (e.g. VERSION=v1.0.11)
+export VERSION=v1.0.11
+
+curl -LO "https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/download/${VERSION}/vigor-gateway-${VERSION}-linux-x86_64.tar.gz"
+curl -LO "https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/download/${VERSION}/vigor-gateway-${VERSION}-linux-x86_64.tar.gz.sha256"
+sha256sum -c "vigor-gateway-${VERSION}-linux-x86_64.tar.gz.sha256"
+tar -xzf "vigor-gateway-${VERSION}-linux-x86_64.tar.gz"
+cd "vigor-gateway-${VERSION}-linux-x86_64"
 sudo ./install.sh
 ```
 
