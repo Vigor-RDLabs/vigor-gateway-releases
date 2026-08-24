@@ -32,8 +32,8 @@ Use:
 On the target Linux machine:
 
 ```bash
-# Set your target version (e.g. VERSION=v1.0.11)
-export VERSION=v1.0.11
+# Set your target version (e.g. VERSION=v1.0.19)
+export VERSION=v1.0.19
 
 curl -LO "https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/download/${VERSION}/vigor-gateway-${VERSION}-linux-x86_64.tar.gz"
 curl -LO "https://github.com/Vigor-RDLabs/vigor-gateway-releases/releases/download/${VERSION}/vigor-gateway-${VERSION}-linux-x86_64.tar.gz.sha256"
