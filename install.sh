@@ -19,6 +19,7 @@ require_root() {
 VERSION=""
 PAIRING_CODE=""
 API_URL="https://api.vigorlabs.org"
+OS_ARCH=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -34,11 +35,24 @@ while [[ $# -gt 0 ]]; do
       API_URL="$2"
       shift 2
       ;;
+    --os)
+      OS_ARCH="$2"
+      shift 2
+      ;;
     *)
       fail "Unknown option: $1"
       ;;
   esac
 done
+
+if [ -z "$OS_ARCH" ]; then
+  ARCH=$(uname -m)
+  if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+    OS_ARCH="linux-aarch64"
+  else
+    OS_ARCH="linux-x86_64"
+  fi
+fi
 
 if [ -z "$VERSION" ]; then
   echo "Resolving latest gateway version..."
@@ -65,7 +79,7 @@ if [ "$STANDALONE_MODE" = "true" ]; then
   TMP_DIR=$(mktemp -d)
   trap 'rm -rf "$TMP_DIR"' EXIT
 
-  TARBALL="vigor-gateway-${VERSION}-linux-x86_64.tar.gz"
+  TARBALL="vigor-gateway-${VERSION}-${OS_ARCH}.tar.gz"
   CHECKSUM="${TARBALL}.sha256"
 
   echo "Downloading tarball..."
@@ -78,7 +92,7 @@ if [ "$STANDALONE_MODE" = "true" ]; then
   echo "Extracting release bundle..."
   tar -xzf "$TMP_DIR/$TARBALL" -C "$TMP_DIR"
 
-  SCRIPT_DIR="$TMP_DIR/vigor-gateway-${VERSION}-linux-x86_64"
+  SCRIPT_DIR="$TMP_DIR/vigor-gateway-${VERSION}-${OS_ARCH}"
 fi
 
 verify_bundle_files() {
