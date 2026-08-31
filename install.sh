@@ -79,7 +79,10 @@ if [ "$STANDALONE_MODE" = "true" ]; then
   TMP_DIR=$(mktemp -d)
   trap 'rm -rf "$TMP_DIR"' EXIT
 
-  TARBALL="vigor-gateway-${VERSION}-${OS_ARCH}.tar.gz"
+  BASE_VERSION="${VERSION%-aarch64}"
+  BASE_VERSION="${BASE_VERSION%-x86_64}"
+
+  TARBALL="vigor-gateway-${BASE_VERSION}-${OS_ARCH}.tar.gz"
   CHECKSUM="${TARBALL}.sha256"
 
   echo "Downloading tarball..."
@@ -92,7 +95,7 @@ if [ "$STANDALONE_MODE" = "true" ]; then
   echo "Extracting release bundle..."
   tar -xzf "$TMP_DIR/$TARBALL" -C "$TMP_DIR"
 
-  SCRIPT_DIR="$TMP_DIR/vigor-gateway-${VERSION}-${OS_ARCH}"
+  SCRIPT_DIR="$TMP_DIR/vigor-gateway-${BASE_VERSION}-${OS_ARCH}"
 fi
 
 verify_bundle_files() {
