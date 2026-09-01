@@ -159,6 +159,13 @@ if ! id -u vigor >/dev/null 2>&1; then
   echo "Created unprivileged service user 'vigor'"
 fi
 
+# Configure sudoers for OTA updates
+cat > /etc/sudoers.d/vigor-gateway-ota << 'EOF'
+vigor ALL=(ALL) NOPASSWD: /usr/bin/bash -s -- --version *, /bin/bash -s -- --version *
+EOF
+chmod 0440 /etc/sudoers.d/vigor-gateway-ota
+echo "Configured sudoers for OTA updates"
+
 # 2. Setup directories
 mkdir -p /opt/vigor/bin
 mkdir -p /etc/vigor
